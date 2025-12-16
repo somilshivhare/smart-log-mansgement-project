@@ -59,7 +59,7 @@ export const postlogin = async (req, res) => {
       ...(check.role && { role: check.role }),
     };
     console.log(payload);
-    const token = jwt.sign(payload, "jwt-secret");
+    const token = jwt.sign(payload, process.env.JWT_SECRET);
     res.cookie("token", token, {
       httpOnly: true,
       sameSite: "lax",

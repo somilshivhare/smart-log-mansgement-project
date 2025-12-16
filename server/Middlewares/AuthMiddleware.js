@@ -1,4 +1,6 @@
 import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv';
+dotenv.config();
 export const authMiddleware = (req, res, next) => {
   const token = req.cookies.token;
   if (!token) {
@@ -7,7 +9,7 @@ export const authMiddleware = (req, res, next) => {
   }
 
   try {
-    const decodedToken = jwt.verify(token, 'jwt-secret');
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (decodedToken.role!='citizen'){
       return res.status(403).json({success:false,message:"User access denied"});
     }
@@ -30,7 +32,7 @@ export const adminMiddleware = (req, res, next) => {
   }
 
   try {
-    const decodedToken = jwt.verify(token, 'jwt-secret');
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     if (decodedToken.role!='admin'){
       console.log("User is not admin")
       return res.status(403).json({success:false,message:"Admin access denied"});

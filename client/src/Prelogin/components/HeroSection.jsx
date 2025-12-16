@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 
 export default function HeroSection() {
   const heroRef = useRef(null)
   const cardRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -39,6 +41,7 @@ export default function HeroSection() {
               <Button
                 size="lg"
                 className="bg-accent text-accent-foreground hover:bg-accent/90 text-base hover:scale-105 transition-transform duration-200"
+                onClick={() => navigate("/signup")}
               >
                 Get Started
               </Button>
@@ -46,6 +49,7 @@ export default function HeroSection() {
                 size="lg"
                 variant="outline"
                 className="text-base bg-transparent hover:scale-105 transition-transform duration-200"
+                onClick={() => navigate("/how-it-works")}
               >
                 Learn More
               </Button>

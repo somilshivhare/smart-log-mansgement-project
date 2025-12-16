@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button"
 import { useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 export default function CtaSection() {
   const ctaRef = useRef(null)
+  const navigate = useNavigate();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -38,6 +40,7 @@ export default function CtaSection() {
             <Button
               size="lg"
               className="bg-accent text-accent-foreground hover:bg-accent/90 text-base hover:scale-105 transition-transform duration-200"
+              onClick={() => navigate("/signup")}
             >
               Create Account
             </Button>
@@ -45,6 +48,7 @@ export default function CtaSection() {
               size="lg"
               variant="outline"
               className="text-base bg-transparent hover:scale-105 transition-transform duration-200"
+              onClick={() => navigate("/contact")}
             >
               Contact Support
             </Button>

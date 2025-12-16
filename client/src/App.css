@@ -122,6 +122,11 @@
   }
 }
 
+html,
+body {
+  scroll-behavior: smooth;
+}
+
 @layer utilities {
   .animate-in {
     opacity: 1 !important;

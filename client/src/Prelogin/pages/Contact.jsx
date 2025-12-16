@@ -27,7 +27,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="py-20 md:py-28">
+      <main className="py-20 md:py-28 animate-[fade-in-up_0.5s_ease-out]">
         <div className="container mx-auto px-4 lg:px-8 max-w-4xl">
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-balance">Contact Us</h1>

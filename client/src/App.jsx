@@ -17,6 +17,13 @@ import AboutPage from "./Prelogin/pages/About";
 import ContactPage from "./Prelogin/pages/Contact";
 import LoginPage from "./Prelogin/pages/Login";
 import SignUpPage from "./Prelogin/pages/Signup";
+import PrivacyPage from "./Prelogin/pages/Privacy";
+import TermsPage from "./Prelogin/pages/Terms";
+import DocumentationPage from "./Prelogin/pages/Documentation";
+import HelpCenterPage from "./Prelogin/pages/HelpCenter";
+import PlatformInfoPage from "./Prelogin/pages/PlatformInfo";
+import ScrollToTop from "./components/ScrollToTop";
+import GoogleCallback from "./GoogleCallback";
 import PrivateAuth from "./Middlewares/CitizenAuthMiddleware";
 import PrivateAdminAuth from "./Middlewares/AdminAuthMiddleware";
 import { UserProvider } from "./Context/UserContext";
@@ -24,12 +31,22 @@ function App() {
   return (
     <UserProvider>
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Page />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/documentation" element={<DocumentationPage />} />
+        <Route path="/help-center" element={<HelpCenterPage />} />
+        <Route path="/how-it-works" element={<PlatformInfoPage title="How It Works" />} />
+        <Route path="/features" element={<PlatformInfoPage title="Features" />} />
+        <Route path="/security" element={<PlatformInfoPage title="Security" />} />
+        <Route path="/compliance" element={<PlatformInfoPage title="Compliance" />} />
+        <Route path="/auth/google/callback" element={<GoogleCallback />} />
         <Route
           path="/citizen/*"
           element={

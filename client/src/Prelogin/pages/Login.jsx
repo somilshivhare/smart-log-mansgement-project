@@ -7,11 +7,38 @@ import { Card } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
 import { Eye, EyeOff } from "lucide-react";
 import axios from "axios";
+
+const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+
+  const handleGoogleLogin = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const redirectUri =
+      import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
+      `${window.location.origin}/auth/google/callback`;
+
+    if (!clientId) {
+      alert("Google Client ID is not configured.");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: ["openid", "email", "profile"].join(" "),
+      access_type: "offline",
+      include_granted_scopes: "true",
+      prompt: "consent",
+    });
+
+    window.location.href = `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -115,9 +142,24 @@ export default function LoginPage() {
               <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-card text-muted-foreground">Or</span>
+              <span className="px-4 bg-card text-muted-foreground">
+                Or continue with
+              </span>
             </div>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-11 mb-4 flex items-center justify-center gap-3 bg-card hover:bg-muted border-input"
+            onClick={handleGoogleLogin}
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
+              <span className="text-lg font-semibold text-[#4285F4]">G</span>
+            </span>
+            <span className="text-sm font-medium text-foreground">
+              Sign in with Google
+            </span>
+          </Button>
           <div className="text-center">
             <p className="text-muted-foreground">
               Don't have an account?{" "}
