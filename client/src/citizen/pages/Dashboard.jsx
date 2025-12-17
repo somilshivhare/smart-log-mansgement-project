@@ -1,13 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Upload,
-  FileText,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 export default function Dashboard() {
@@ -15,67 +10,23 @@ export default function Dashboard() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [documentType, setDocumentType] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [verificationResult, setVerificationResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const [documents, setDocuments] = useState([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [documentsError, setDocumentsError] = useState("");
 
   const documentsPerPage = 5;
 
-  // Mock data
-  const stats = {
-    total: 24,
-    approved: 18,
-    pending: 4,
-  };
-
-  const documents = [
-    {
-      id: 1,
-      name: "Aadhaar_Card.pdf",
-      type: "Identity Proof",
-      date: "2024-03-10",
-      status: "approved",
-    },
-    {
-      id: 2,
-      name: "PAN_Card.pdf",
-      type: "Tax Document",
-      date: "2024-03-12",
-      status: "approved",
-    },
-    {
-      id: 3,
-      name: "Birth_Certificate.pdf",
-      type: "Identity Proof",
-      date: "2024-03-14",
-      status: "pending",
-    },
-    {
-      id: 4,
-      name: "Income_Certificate.pdf",
-      type: "Financial Document",
-      date: "2024-03-15",
-      status: "pending",
-    },
-    {
-      id: 5,
-      name: "Residence_Proof.pdf",
-      type: "Address Proof",
-      date: "2024-03-16",
-      status: "rejected",
-    },
-    {
-      id: 6,
-      name: "Driving_License.pdf",
-      type: "Identity Proof",
-      date: "2024-03-18",
-      status: "approved",
-    },
-    {
-      id: 7,
-      name: "Voter_ID.pdf",
-      type: "Identity Proof",
-      date: "2024-03-20",
-      status: "approved",
-    },
-  ];
+  const stats = useMemo(() => {
+    const total = documents.length;
+    const approved = documents.filter((d) => d?.status === "approved").length;
+    const pending = documents.filter((d) => d?.status === "pending").length;
+    return { total, approved, pending };
+  }, [documents]);
 
   const activityLogs = [
     {
@@ -110,12 +61,38 @@ export default function Dashboard() {
     },
   ];
 
-  const verificationResult = {
-    documentName: "PAN_Card.pdf",
-    confidence: 94,
-    feedback:
-      "Document verified successfully. All details match with government records. Document is authentic and valid.",
+  const API_BASE_URL = "http://localhost:4000";
+
+  const fetchDocuments = async () => {
+    setDocumentsError("");
+    try {
+      setIsLoadingDocuments(true);
+      const response = await fetch(
+        `${API_BASE_URL}/api/document/fetch-documents`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.error || data?.message || "Failed to load documents"
+        );
+      }
+      setDocuments(Array.isArray(data.documents) ? data.documents : []);
+      setCurrentPage(1);
+    } catch (err) {
+      setDocumentsError(err?.message || "Failed to load documents");
+    } finally {
+      setIsLoadingDocuments(false);
+    }
   };
+
+  useEffect(() => {
+    fetchDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -123,12 +100,72 @@ export default function Dashboard() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (selectedFile && documentType) {
-      alert(`Submitting ${selectedFile.name} as ${documentType}`);
+    setUploadError("");
+
+    if (!selectedFile || !documentType) {
+      toast.error("Please select a document type and file.");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+
+      const formData = new FormData();
+      formData.append("document", selectedFile);
+      formData.append("documentType", documentType);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/document/upload-document`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Upload failed");
+      }
+
+      const confidence = data?.verification?.confiedenceScore;
+      const feedbackRaw = data?.verification?.Feedback;
+      let feedbackText = "";
+      try {
+        const parsed =
+          typeof feedbackRaw === "string"
+            ? JSON.parse(feedbackRaw)
+            : feedbackRaw;
+        if (parsed?.issues?.length) {
+          feedbackText = parsed.issues.join("\n");
+        } else {
+          feedbackText =
+            typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+        }
+      } catch {
+        feedbackText = typeof feedbackRaw === "string" ? feedbackRaw : "";
+      }
+
+      setVerificationResult({
+        documentName: data?.document?.name || selectedFile.name,
+        confidence: typeof confidence === "number" ? confidence : 0,
+        feedback: feedbackText,
+      });
+
       setSelectedFile(null);
       setDocumentType("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      toast.success("Document submitted for verification.");
+
+      await fetchDocuments();
+    } catch (err) {
+      const message = err?.message || "Upload failed";
+      setUploadError(message);
+      toast.error(message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -145,12 +182,19 @@ export default function Dashboard() {
     }
   };
 
-  const totalPages = Math.ceil(documents.length / documentsPerPage);
+  const totalPages = Math.ceil(documents.length / documentsPerPage) || 1;
   const startIndex = (currentPage - 1) * documentsPerPage;
   const paginatedDocuments = documents.slice(
     startIndex,
     startIndex + documentsPerPage
   );
+
+  const formatDate = (value) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toISOString().slice(0, 10);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -216,13 +260,14 @@ export default function Dashboard() {
                   htmlFor="file-upload"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  Choose File (PDF or Image)
+                  Choose File (Image)
                 </label>
                 <input
                   id="file-upload"
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".jpg,.jpeg,.png"
                   onChange={handleFileChange}
+                  ref={fileInputRef}
                   className="w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 file:mr-4 file:py-1 file:px-4 file:border-0 file:bg-gray-700 file:text-white file:text-sm hover:file:bg-gray-800"
                   required
                 />
@@ -235,11 +280,15 @@ export default function Dashboard() {
             )}
             <Button
               type="submit"
+              disabled={isUploading}
               className="bg-gray-800 text-white hover:bg-gray-900 px-6"
             >
               <Upload className="w-4 h-4 mr-2" />
-              Submit Document
+              {isUploading ? "Submitting..." : "Submit Document"}
             </Button>
+            {uploadError ? (
+              <div className="text-sm text-red-700">{uploadError}</div>
+            ) : null}
           </form>
         </div>
 
@@ -272,44 +321,66 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {paginatedDocuments.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {doc.name}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {doc.type}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {doc.date}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-block px-3 py-1 text-xs font-medium ${getStatusColor(
-                          doc.status
-                        )}`}
-                      >
-                        {doc.status.charAt(0).toUpperCase() +
-                          doc.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => navigate(`/citizen/document/${doc.id}`)}
-                        className="text-sm text-gray-700 hover:text-gray-900 underline"
-                      >
-                        View Details
-                      </button>
+                {isLoadingDocuments ? (
+                  <tr>
+                    <td className="px-6 py-6 text-sm text-gray-600" colSpan={5}>
+                      Loading documents...
                     </td>
                   </tr>
-                ))}
+                ) : documentsError ? (
+                  <tr>
+                    <td className="px-6 py-6 text-sm text-red-700" colSpan={5}>
+                      {documentsError}
+                    </td>
+                  </tr>
+                ) : paginatedDocuments.length === 0 ? (
+                  <tr>
+                    <td className="px-6 py-6 text-sm text-gray-600" colSpan={5}>
+                      No documents uploaded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedDocuments.map((doc) => (
+                    <tr key={doc._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {doc.name}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {doc.type}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {formatDate(doc.uploadedAt)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-block px-3 py-1 text-xs font-medium ${getStatusColor(
+                            doc.status
+                          )}`}
+                        >
+                          {doc.status.charAt(0).toUpperCase() +
+                            doc.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() =>
+                            navigate(`/citizen/document/${doc._id}`)
+                          }
+                          className="text-sm text-gray-700 hover:text-gray-900 underline"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
           {/* Pagination */}
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              Showing {startIndex + 1} to{" "}
+              Showing {documents.length === 0 ? 0 : startIndex + 1} to{" "}
               {Math.min(startIndex + documentsPerPage, documents.length)} of{" "}
               {documents.length} documents
             </div>
@@ -329,6 +400,7 @@ export default function Dashboard() {
                   variant={currentPage === i + 1 ? "default" : "outline"}
                   size="sm"
                   onClick={() => setCurrentPage(i + 1)}
+                  disabled={documents.length === 0}
                   className={
                     currentPage === i + 1
                       ? "bg-gray-800 text-white hover:bg-gray-900"
@@ -358,32 +430,38 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Recent Verification Result
           </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Document:
-              </span>
-              <span className="text-sm text-gray-900">
-                {verificationResult.documentName}
-              </span>
+          {verificationResult ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">
+                  Document:
+                </span>
+                <span className="text-sm text-gray-900">
+                  {verificationResult.documentName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">
+                  Confidence Score:
+                </span>
+                <span className="text-sm font-semibold text-green-700">
+                  {verificationResult.confidence}%
+                </span>
+              </div>
+              <div className="pt-2 border-t border-gray-200">
+                <span className="text-sm font-medium text-gray-700 block mb-2">
+                  Feedback:
+                </span>
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                  {verificationResult.feedback}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Confidence Score:
-              </span>
-              <span className="text-sm font-semibold text-green-700">
-                {verificationResult.confidence}%
-              </span>
+          ) : (
+            <div className="text-sm text-gray-600">
+              No verification results yet.
             </div>
-            <div className="pt-2 border-t border-gray-200">
-              <span className="text-sm font-medium text-gray-700 block mb-2">
-                Feedback:
-              </span>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {verificationResult.feedback}
-              </p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* User Activity Logs */}

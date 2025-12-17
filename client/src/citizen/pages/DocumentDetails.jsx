@@ -1,138 +1,62 @@
-import { useParams } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowLeft,
-  Download,
-  CheckCircle,
-  XCircle,
-  Clock,
-} from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export default function DocumentDetailsPage() {
   const { id: documentId } = useParams();
-  const documents = {
-    1: {
-      id: 1,
-      name: "Aadhaar_Card.pdf",
-      type: "Identity Proof",
-      uploadDate: "2024-03-10",
-      status: "approved",
-      fileSize: "2.3 MB",
-      verificationDate: "2024-03-11",
-      verifiedBy: "Ministry of Home Affairs",
-      confidence: 96,
-      feedback:
-        "Document verified successfully. Aadhaar number matches with UIDAI records. All details are authentic and valid for official use.",
-      remarks: "No discrepancies found. Document is genuine.",
-      history: [
-        {
-          date: "2024-03-11 15:30",
-          event: "Document approved by verification authority",
-        },
-        {
-          date: "2024-03-10 18:45",
-          event: "AI verification completed with 96% confidence",
-        },
-        {
-          date: "2024-03-10 18:20",
-          event: "Document submitted for verification",
-        },
-        { date: "2024-03-10 18:15", event: "Document uploaded to system" },
-      ],
-    },
-    2: {
-      id: 2,
-      name: "PAN_Card.pdf",
-      type: "Tax Document",
-      uploadDate: "2024-03-12",
-      status: "approved",
-      fileSize: "1.8 MB",
-      verificationDate: "2024-03-13",
-      verifiedBy: "Income Tax Department",
-      confidence: 94,
-      feedback:
-        "Document verified successfully. All details match with government records. Document is authentic and valid.",
-      remarks: "PAN details verified with Income Tax database.",
-      history: [
-        {
-          date: "2024-03-13 10:20",
-          event: "Document approved by verification authority",
-        },
-        {
-          date: "2024-03-12 16:30",
-          event: "AI verification completed with 94% confidence",
-        },
-        {
-          date: "2024-03-12 16:10",
-          event: "Document submitted for verification",
-        },
-        { date: "2024-03-12 16:05", event: "Document uploaded to system" },
-      ],
-    },
-    3: {
-      id: 3,
-      name: "Birth_Certificate.pdf",
-      type: "Identity Proof",
-      uploadDate: "2024-03-14",
-      status: "pending",
-      fileSize: "3.1 MB",
-      verificationDate: null,
-      verifiedBy: null,
-      confidence: 88,
-      feedback:
-        "Document is under review by verification authority. AI analysis completed. Awaiting manual verification.",
-      remarks: "Pending review - Municipal records verification in progress.",
-      history: [
-        { date: "2024-03-14 14:45", event: "Assigned to verification officer" },
-        {
-          date: "2024-03-14 14:20",
-          event: "AI verification completed with 88% confidence",
-        },
-        {
-          date: "2024-03-14 14:05",
-          event: "Document submitted for verification",
-        },
-        { date: "2024-03-14 14:00", event: "Document uploaded to system" },
-      ],
-    },
-    5: {
-      id: 5,
-      name: "Residence_Proof.pdf",
-      type: "Address Proof",
-      uploadDate: "2024-03-16",
-      status: "rejected",
-      fileSize: "2.5 MB",
-      verificationDate: "2024-03-16",
-      verifiedBy: "Municipal Authority",
-      confidence: 45,
-      feedback:
-        "Document verification failed. Address format does not match standard requirements. Please upload a valid address proof document.",
-      remarks:
-        "Rejected - Document does not meet verification criteria. Address details unclear.",
-      history: [
-        {
-          date: "2024-03-16 17:30",
-          event: "Document rejected by verification authority",
-        },
-        {
-          date: "2024-03-16 17:10",
-          event: "Manual review flagged issues with address format",
-        },
-        {
-          date: "2024-03-16 16:55",
-          event: "AI verification completed with 45% confidence",
-        },
-        {
-          date: "2024-03-16 16:50",
-          event: "Document submitted for verification",
-        },
-        { date: "2024-03-16 16:45", event: "Document uploaded to system" },
-      ],
-    },
-  };
+  const API_BASE_URL = "http://localhost:4000";
+  const [document, setDocument] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const document = documents[documentId] || documents[1];
+  useEffect(() => {
+    const load = async () => {
+      if (!documentId) return;
+      setError("");
+      try {
+        setIsLoading(true);
+        const response = await fetch(
+          `${API_BASE_URL}/api/document/${documentId}`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+          throw new Error(
+            data?.error || data?.message || "Failed to load document"
+          );
+        }
+        setDocument(data.document);
+      } catch (err) {
+        setError(err?.message || "Failed to load document");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [documentId]);
+
+  const safeDocument = useMemo(() => {
+    return (
+      document || {
+        name: "-",
+        type: "-",
+        uploadDate: "-",
+        status: "pending",
+        fileSize: "-",
+        verificationDate: null,
+        verifiedBy: null,
+        confidence: null,
+        feedback: "-",
+        remarks: "-",
+        history: [],
+        url: null,
+      }
+    );
+  }, [document]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -173,25 +97,40 @@ export default function DocumentDetailsPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-8">
           Document Details
         </h1>
+        {isLoading ? (
+          <div className="bg-white border border-gray-200 p-6 mb-6 text-sm text-gray-600">
+            Loading document...
+          </div>
+        ) : error ? (
+          <div className="bg-white border border-gray-200 p-6 mb-6 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
         <div className="bg-white border border-gray-200 p-6 mb-6">
           <div className="flex items-start justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                {document.name}
+                {safeDocument.name}
               </h2>
               <div className="flex items-center gap-2">
-                {getStatusIcon(document.status)}
+                {getStatusIcon(safeDocument.status)}
                 <span
                   className={`inline-block px-3 py-1 text-xs font-medium ${getStatusColor(
-                    document.status
+                    safeDocument.status
                   )}`}
                 >
-                  {document.status.charAt(0).toUpperCase() +
-                    document.status.slice(1)}
+                  {safeDocument.status.charAt(0).toUpperCase() +
+                    safeDocument.status.slice(1)}
                 </span>
               </div>
             </div>
-            <Button className="bg-gray-800 text-white hover:bg-gray-900">
+            <Button
+              className="bg-gray-800 text-white hover:bg-gray-900"
+              onClick={() => {
+                if (safeDocument.url) window.open(safeDocument.url, "_blank");
+              }}
+              disabled={!safeDocument.url}
+            >
               <Download className="w-4 h-4 mr-2" />
               Download
             </Button>
@@ -202,21 +141,23 @@ export default function DocumentDetailsPage() {
                 <div className="text-sm font-medium text-gray-700 mb-1">
                   Document Type
                 </div>
-                <div className="text-sm text-gray-900">{document.type}</div>
+                <div className="text-sm text-gray-900">{safeDocument.type}</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1">
                   Upload Date
                 </div>
                 <div className="text-sm text-gray-900">
-                  {document.uploadDate}
+                  {safeDocument.uploadDate}
                 </div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1">
                   File Size
                 </div>
-                <div className="text-sm text-gray-900">{document.fileSize}</div>
+                <div className="text-sm text-gray-900">
+                  {safeDocument.fileSize}
+                </div>
               </div>
             </div>
             <div className="space-y-4">
@@ -225,7 +166,7 @@ export default function DocumentDetailsPage() {
                   Verification Date
                 </div>
                 <div className="text-sm text-gray-900">
-                  {document.verificationDate || "Pending"}
+                  {safeDocument.verificationDate || "Pending"}
                 </div>
               </div>
               <div>
@@ -233,7 +174,7 @@ export default function DocumentDetailsPage() {
                   Verified By
                 </div>
                 <div className="text-sm text-gray-900">
-                  {document.verifiedBy || "N/A"}
+                  {safeDocument.verifiedBy || "N/A"}
                 </div>
               </div>
               <div>
@@ -241,7 +182,9 @@ export default function DocumentDetailsPage() {
                   Confidence Score
                 </div>
                 <div className="text-sm font-semibold text-gray-900">
-                  {document.confidence}%
+                  {typeof safeDocument.confidence === "number"
+                    ? `${safeDocument.confidence}%`
+                    : "N/A"}
                 </div>
               </div>
             </div>
@@ -257,7 +200,7 @@ export default function DocumentDetailsPage() {
                 Analysis Result
               </div>
               <p className="text-sm text-gray-900 leading-relaxed">
-                {document.feedback}
+                {safeDocument.feedback}
               </p>
             </div>
             <div className="pt-4 border-t border-gray-200">
@@ -265,7 +208,7 @@ export default function DocumentDetailsPage() {
                 Remarks
               </div>
               <p className="text-sm text-gray-900 leading-relaxed">
-                {document.remarks}
+                {safeDocument.remarks}
               </p>
             </div>
           </div>
@@ -278,11 +221,11 @@ export default function DocumentDetailsPage() {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {document.history.map((item, index) => (
+              {safeDocument.history.map((item, index) => (
                 <div key={index} className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <div className="w-2 h-2 rounded-full bg-gray-800"></div>
-                    {index < document.history.length - 1 && (
+                    {index < safeDocument.history.length - 1 && (
                       <div className="w-px h-full bg-gray-300 mt-1"></div>
                     )}
                   </div>
@@ -294,6 +237,11 @@ export default function DocumentDetailsPage() {
                   </div>
                 </div>
               ))}
+              {safeDocument.history.length === 0 ? (
+                <div className="text-sm text-gray-600">
+                  No timeline available.
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

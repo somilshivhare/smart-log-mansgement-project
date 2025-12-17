@@ -12,5 +12,4 @@ router.post("/signup", postsignup);
 router.post("/login", postlogin);
 router.post("/logout", postlogout);
 router.post("/google", googleLogin);
-
 export default router;

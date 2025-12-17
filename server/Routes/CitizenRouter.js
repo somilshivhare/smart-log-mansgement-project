@@ -14,5 +14,4 @@ router.get("/profile", getCitizenProfile);
 router.get("/account/data", downloadAccountData);
 router.post("/account/clear", clearAccountData);
 router.post("/account/delete", deleteAccount);
-
 export default router;
