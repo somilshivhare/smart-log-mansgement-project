@@ -9,9 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import AlertModal from "@/components/ui/AlertModal";
 
-const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
-
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,56 +22,16 @@ export default function LoginPage() {
     onPrimary: null,
   });
 
-  const handleGoogleLogin = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri =
-      import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
-      `${window.location.origin}/auth/google/callback`;
-
-    if (!clientId) {
-      setAlertState({
-        open: true,
-        title: "Configuration",
-        message: "Google Client ID is not configured.",
-        primaryLabel: "OK",
-        onPrimary: () => setAlertState({ open: false }),
-      });
-      return;
-    }
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: ["openid", "email", "profile"].join(" "),
-      access_type: "offline",
-      include_granted_scopes: "true",
-      prompt: "consent",
-    });
-
-    window.location.href = `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
-  };
-  const getLocation = () =>
-    new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(undefined);
-      const done = (pos) =>
-        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      const fail = () => resolve(undefined);
-      const opts = { enableHighAccuracy: false, timeout: 4000 };
-      navigator.geolocation.getCurrentPosition(done, fail, opts);
-    });
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const location = await getLocation();
       const res = await axios.post(
-        `${import.meta.env.VITE_API_PATH}/citizen/auth/login`,
-        { email, password, location },
+        `${import.meta.env.VITE_API_PATH}/admin/auth/login`,
+        { email, password },
         { withCredentials: true }
       );
       if (res.data.success) {
-        navigate("/citizen");
+        navigate("/admin/dashboard");
       } else {
         setAlertState({
           open: true,
@@ -95,6 +53,7 @@ export default function LoginPage() {
       });
     }
   };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md animate-[fade-in-up_0.6s_ease-out]">
@@ -109,10 +68,10 @@ export default function LoginPage() {
             </span>
           </Link>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Welcome Back
+            Admin Sign In
           </h1>
           <p className="text-muted-foreground">
-            Sign in to your account to continue
+            Sign in to your admin account to manage verifications
           </p>
         </div>
         <Card className="p-8 shadow-lg border-border">
@@ -124,7 +83,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -139,12 +98,6 @@ export default function LoginPage() {
                 >
                   Password
                 </Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:text-accent transition-colors"
-                >
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
                 <Input
@@ -179,45 +132,30 @@ export default function LoginPage() {
               <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-card text-muted-foreground">
-                Or continue with
-              </span>
+              <span className="px-4 bg-card text-muted-foreground">Or</span>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-11 mb-4 flex items-center justify-center gap-3 bg-card hover:bg-muted border-input"
-            onClick={handleGoogleLogin}
-          >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
-              <span className="text-lg font-semibold text-[#4285F4]">G</span>
-            </span>
-            <span className="text-sm font-medium text-foreground">
-              Sign in with Google
-            </span>
-          </Button>
-          <AlertModal
-            open={alertState.open}
-            title={alertState.title}
-            message={alertState.message}
-            primaryLabel={alertState.primaryLabel}
-            onPrimary={
-              alertState.onPrimary || (() => setAlertState({ open: false }))
-            }
-          />
           <div className="text-center">
             <p className="text-muted-foreground">
-              Don't have an account?{" "}
+              Don't have an admin account?{" "}
               <Link
-                to="/signup"
+                to="/admin/signup"
                 className="text-primary font-medium hover:text-accent transition-colors"
               >
-                Create an account
+                Create one
               </Link>
             </p>
           </div>
         </Card>
+        <AlertModal
+          open={alertState.open}
+          title={alertState.title}
+          message={alertState.message}
+          primaryLabel={alertState.primaryLabel}
+          onPrimary={
+            alertState.onPrimary || (() => setAlertState({ open: false }))
+          }
+        />
         <div className="text-center mt-6">
           <Link
             to="/"

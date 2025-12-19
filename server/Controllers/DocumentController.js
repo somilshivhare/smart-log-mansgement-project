@@ -2,6 +2,7 @@ import cloudinary from "../Config/cloudinary.js";
 import Tesseract from "tesseract.js";
 import { Document } from "../Models/Document.js";
 import { Verification } from "../Models/Verification.js";
+import { ActivityHistory } from "../Models/ActivityHistory.js";
 
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -74,6 +75,29 @@ export const uploadDocument = async (req, res) => {
           type: documentType,
           status: "pending",
         });
+        // Log activity: document upload
+        await ActivityHistory.create({
+          userId,
+          documentId: doc._id,
+          action: "upload",
+          details: `Document '${doc.name}' uploaded`,
+          performedBy: userId,
+          performedByModel: "Citizen",
+        });
+        try {
+          const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+          await LogsAndAudit.log({
+            level: "INFO",
+            module: "Document Upload",
+            message: `New document uploaded - ${doc._id}`,
+            userId,
+          });
+        } catch (err) {
+          console.warn(
+            "Failed to write document upload log",
+            err?.message || err
+          );
+        }
         const prompt = `You are an AI document analysis assistant.
 
 I will provide you with text that has been extracted from a document.
@@ -125,6 +149,31 @@ Rules:
           confiedenceScore: geminiData.confidence_score,
           AnalysisData: text,
           Feedback: JSON.stringify(geminiData.feedback),
+        });
+        // Log AI confidence warnings if below threshold
+        try {
+          const score = Number(geminiData.confidence_score);
+          const threshold = 80;
+          if (!Number.isNaN(score) && score < threshold) {
+            const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+            await LogsAndAudit.log({
+              level: "WARN",
+              module: "AI Service",
+              message: `AI confidence score below threshold (${score}%) for ${doc._id}`,
+              userId,
+            });
+          }
+        } catch (err) {
+          console.warn("Failed to write AI warning log", err?.message || err);
+        }
+        // Log activity: document sent for verification
+        await ActivityHistory.create({
+          userId,
+          documentId: doc._id,
+          action: "verify",
+          details: `Document '${doc.name}' sent for AI verification`,
+          performedBy: userId,
+          performedByModel: "Citizen",
         });
         res.status(200).json({ success: true, document: doc, verification });
       }

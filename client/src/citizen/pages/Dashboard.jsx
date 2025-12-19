@@ -28,38 +28,31 @@ export default function Dashboard() {
     return { total, approved, pending };
   }, [documents]);
 
-  const activityLogs = [
-    {
-      id: 1,
-      timestamp: "2024-03-20 14:23",
-      action: "Uploaded Voter_ID.pdf for verification",
-    },
-    {
-      id: 2,
-      timestamp: "2024-03-18 09:15",
-      action: "Driving_License.pdf approved by verification authority",
-    },
-    {
-      id: 3,
-      timestamp: "2024-03-16 16:45",
-      action: "Uploaded Residence_Proof.pdf for verification",
-    },
-    {
-      id: 4,
-      timestamp: "2024-03-16 11:30",
-      action: "Residence_Proof.pdf rejected - invalid address format",
-    },
-    {
-      id: 5,
-      timestamp: "2024-03-15 13:20",
-      action: "Uploaded Income_Certificate.pdf for verification",
-    },
-    {
-      id: 6,
-      timestamp: "2024-03-14 10:10",
-      action: "Uploaded Birth_Certificate.pdf for verification",
-    },
-  ];
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [activityError, setActivityError] = useState("");
+  // Fetch user activity logs
+  const fetchActivityLogs = async () => {
+    setActivityError("");
+    try {
+      setIsLoadingActivity(true);
+      const response = await fetch(
+        `${API_BASE_URL}/api/user/activity/history`,
+        { credentials: "include" }
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(
+          data?.error || data?.message || "Failed to load activity history"
+        );
+      }
+      setActivityLogs(Array.isArray(data.activities) ? data.activities : []);
+    } catch (err) {
+      setActivityError(err?.message || "Failed to load activity history");
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  };
 
   const API_BASE_URL = "http://localhost:4000";
 
@@ -80,8 +73,69 @@ export default function Dashboard() {
           data?.error || data?.message || "Failed to load documents"
         );
       }
-      setDocuments(Array.isArray(data.documents) ? data.documents : []);
+      const docs = Array.isArray(data.documents) ? data.documents : [];
+      setDocuments(docs);
       setCurrentPage(1);
+      // Set the most recent verification result from the latest document
+      if (docs.length > 0) {
+        // Sort by uploadedAt descending (most recent first)
+        const sorted = [...docs].sort(
+          (a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)
+        );
+        const latest = sorted[0];
+        // Try to get confidence and feedback from top-level or nested verification object
+        const confidence =
+          typeof latest.confidenceScore === "number"
+            ? latest.confidenceScore
+            : typeof latest.confiedenceScore === "number"
+            ? latest.confiedenceScore
+            : typeof latest.verification?.confidenceScore === "number"
+            ? latest.verification.confidenceScore
+            : typeof latest.verification?.confiedenceScore === "number"
+            ? latest.verification.confiedenceScore
+            : 0;
+        let feedbackRaw =
+          latest.feedback ||
+          latest.Feedback ||
+          latest.verification?.feedback ||
+          latest.verification?.Feedback ||
+          "-";
+        let feedback = "-";
+        try {
+          // Try to parse if it's a JSON string
+          const parsed =
+            typeof feedbackRaw === "string" &&
+            feedbackRaw.trim().startsWith("{")
+              ? JSON.parse(feedbackRaw)
+              : feedbackRaw;
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            Array.isArray(parsed.issues) &&
+            parsed.issues.length > 0
+          ) {
+            feedback = parsed.issues.join("\n");
+          } else if (typeof parsed === "string") {
+            feedback = parsed;
+          } else if (parsed && typeof parsed === "object") {
+            feedback = JSON.stringify(parsed);
+          } else {
+            feedback = String(parsed);
+          }
+        } catch {
+          feedback =
+            typeof feedbackRaw === "string"
+              ? feedbackRaw
+              : JSON.stringify(feedbackRaw);
+        }
+        setVerificationResult({
+          documentName: latest.name || "-",
+          confidence,
+          feedback,
+        });
+      } else {
+        setVerificationResult(null);
+      }
     } catch (err) {
       setDocumentsError(err?.message || "Failed to load documents");
     } finally {
@@ -91,6 +145,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDocuments();
+    fetchActivityLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -473,14 +528,37 @@ export default function Dashboard() {
           </div>
           <div className="max-h-96 overflow-y-auto">
             <div className="divide-y divide-gray-200">
-              {activityLogs.map((log) => (
-                <div key={log.id} className="px-6 py-4 hover:bg-gray-50">
-                  <div className="text-xs text-gray-500 mb-1">
-                    {log.timestamp}
-                  </div>
-                  <div className="text-sm text-gray-900">{log.action}</div>
+              {isLoadingActivity ? (
+                <div className="px-6 py-4 text-gray-600">
+                  Loading activity...
                 </div>
-              ))}
+              ) : activityError ? (
+                <div className="px-6 py-4 text-red-700">{activityError}</div>
+              ) : activityLogs.length === 0 ? (
+                <div className="px-6 py-4 text-gray-600">
+                  No activity history found.
+                </div>
+              ) : (
+                activityLogs.map((log) => (
+                  <div key={log._id} className="px-6 py-4 hover:bg-gray-50">
+                    <div className="text-xs text-gray-500 mb-1">
+                      {log.timestamp
+                        ? new Date(log.timestamp).toLocaleString()
+                        : "-"}
+                    </div>
+                    <div className="text-sm text-gray-900">
+                      {log.action.charAt(0).toUpperCase() + log.action.slice(1)}
+                      {log.details ? `: ${log.details}` : ""}
+                    </div>
+                    {log.documentId && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Document: {log.documentId.name || log.documentId._id} (
+                        {log.documentId.type || "-"})
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

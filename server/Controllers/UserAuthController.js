@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import { Citizen } from "../Models/CitizenModel.js";
 import dotenv from "dotenv";
 import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
+import { ActivityHistory } from "../Models/ActivityHistory.js";
 
 dotenv.config();
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -18,6 +20,19 @@ export const postsignup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new Citizen({ name, email, password: hashedPassword });
     await newUser.save();
+    // Log signup
+    try {
+      const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+      await LogsAndAudit.log({
+        level: "INFO",
+        module: "Authentication",
+        message: `New user signup - ${email}`,
+        userId: newUser._id,
+        username: email,
+      });
+    } catch (err) {
+      console.warn("Failed to write signup log", err?.message || err);
+    }
     return res
       .status(201)
       .json({ success: true, message: "Your account created successfully" });
@@ -45,11 +60,52 @@ export const postlogin = async (req, res) => {
     }
     check.lastLoginAt = new Date();
     await check.save();
+
+    // create session id
+    const sessionId = crypto.randomUUID();
+
+    // Log login (LogsAndAudit) and ActivityHistory
+    try {
+      const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+      await LogsAndAudit.log({
+        level: "INFO",
+        module: "Authentication",
+        message: `User login successful - ${email}`,
+        userId: check._id,
+        username: email,
+      });
+    } catch (err) {
+      console.warn("Failed to write login log", err?.message || err);
+    }
+
+    // write activity history (include optional location from client)
+    try {
+      const ip =
+        req.headers["x-forwarded-for"]?.split(",")?.[0]?.trim() || req.ip;
+      const userAgent = req.headers["user-agent"] || "";
+      const location = req.body?.location || undefined;
+      await ActivityHistory.create({
+        userId: check._id,
+        action: "login",
+        sessionId,
+        ip,
+        userAgent,
+        location,
+        details: `Login from IP ${ip}`,
+      });
+    } catch (err) {
+      console.warn(
+        "Failed to write activity history for login",
+        err?.message || err
+      );
+    }
+
     const payload = {
       _id: check._id,
       name: check.name,
       email: check.email,
       role: "citizen",
+      sessionId,
       ...(check.phoneNumber && { phoneNumber: check.phoneNumber }),
       ...(check.address && { address: check.address }),
       ...(check.dateOfBirth && { dateOfBirth: check.dateOfBirth }),
@@ -94,6 +150,45 @@ export const postlogout = async (req, res) => {
       sameSite: "lax",
       secure: false,
     });
+    // Log logout to LogsAndAudit and ActivityHistory (use sessionId from token if available)
+    try {
+      const decoded = jwt.verify(
+        req.cookies?.token || "",
+        process.env.JWT_SECRET
+      );
+      if (decoded && decoded.email) {
+        const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+        await LogsAndAudit.log({
+          level: "INFO",
+          module: "Authentication",
+          message: `User logout - ${decoded.email}`,
+          userId: decoded._id,
+          username: decoded.email,
+        });
+
+        try {
+          const ip =
+            req.headers["x-forwarded-for"]?.split(",")?.[0]?.trim() || req.ip;
+          const userAgent = req.headers["user-agent"] || "";
+          await ActivityHistory.create({
+            userId: decoded._id,
+            action: "logout",
+            sessionId: decoded.sessionId || undefined,
+            ip,
+            userAgent,
+            details: `Logout from IP ${ip}`,
+          });
+        } catch (err) {
+          console.warn(
+            "Failed to write activity history for logout",
+            err?.message || err
+          );
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+
     res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     console.error("Logout error:", error);
@@ -181,6 +276,8 @@ export const googleLogin = async (req, res) => {
       await user.save();
     }
 
+    // create a sessionId for activity tracking
+    const sessionId = crypto.randomUUID();
     const sessionPayload = {
       _id: user._id,
       name: user.name,
@@ -188,6 +285,7 @@ export const googleLogin = async (req, res) => {
       role: "citizen",
       picture,
       googleId: sub,
+      sessionId,
     };
 
     const token = jwt.sign(sessionPayload, process.env.JWT_SECRET);
@@ -197,6 +295,26 @@ export const googleLogin = async (req, res) => {
       sameSite: "lax",
       secure: false,
     });
+
+    // Log login activity
+    try {
+      const ip =
+        req.headers["x-forwarded-for"]?.split(",")?.[0]?.trim() || req.ip;
+      const userAgent = req.headers["user-agent"] || "";
+      await ActivityHistory.create({
+        userId: user._id,
+        action: "login",
+        sessionId,
+        ip,
+        userAgent,
+        details: `Login via Google from IP ${ip}`,
+      });
+    } catch (err) {
+      console.warn(
+        "Failed to write activity history for google login",
+        err?.message || err
+      );
+    }
 
     return res.status(200).json({
       success: true,

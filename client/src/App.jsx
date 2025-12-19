@@ -17,6 +17,8 @@ import AboutPage from "./Prelogin/pages/About";
 import ContactPage from "./Prelogin/pages/Contact";
 import LoginPage from "./Prelogin/pages/Login";
 import SignUpPage from "./Prelogin/pages/Signup";
+import AdminSignUpPage from "./Admin/pages/AdminSignup";
+import AdminLoginPage from "./Admin/pages/AdminLogin";
 import PrivacyPage from "./Prelogin/pages/Privacy";
 import TermsPage from "./Prelogin/pages/Terms";
 import DocumentationPage from "./Prelogin/pages/Documentation";
@@ -40,6 +42,8 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/admin/signup" element={<AdminSignUpPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/documentation" element={<DocumentationPage />} />

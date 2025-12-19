@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import AlertModal from "@/components/ui/AlertModal";
 
-export default function SignUpPage() {
+export default function AdminSignUpPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,23 +40,39 @@ export default function SignUpPage() {
 
     try {
       const res = await axios.post(
-        `${import.meta.env.VITE_API_PATH}/citizen/auth/signup`,
+        `${import.meta.env.VITE_API_PATH}/admin/auth/signup`,
         {
           name: fullName,
           email,
           password,
+          role: "admin",
         },
         { withCredentials: true }
       );
       if (res.data.success) {
+        // Attempt to auto-login the admin so they can be redirected to /admin
+        try {
+          const loginRes = await axios.post(
+            `${import.meta.env.VITE_API_PATH}/admin/auth/login`,
+            { email, password },
+            { withCredentials: true }
+          );
+          if (loginRes.data.success) {
+            navigate("/admin");
+            return;
+          }
+        } catch (e) {
+          // ignore - fallback to showing an instructional message
+        }
+
         setAlertState({
           open: true,
           title: "Success",
-          message: "Account created successfully! Please login.",
+          message: "Admin account created successfully! Please sign in.",
           primaryLabel: "OK",
           onPrimary: () => {
             setAlertState({ open: false });
-            navigate("/login");
+            navigate("/admin/login");
           },
         });
       } else {
@@ -95,10 +111,10 @@ export default function SignUpPage() {
             </span>
           </Link>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Create Account
+            Create Admin Account
           </h1>
           <p className="text-muted-foreground">
-            Get started with secure document verification
+            This will create an admin account with elevated access.
           </p>
         </div>
         <Card className="p-8 shadow-lg border-border">
@@ -124,7 +140,7 @@ export default function SignUpPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -199,18 +215,11 @@ export default function SignUpPage() {
               type="submit"
               className="w-full h-11 bg-primary hover:bg-accent text-primary-foreground font-medium transition-all duration-300 hover:scale-[1.02] mt-6"
             >
-              Create Account
+              Create Admin Account
             </Button>
           </form>
           <p className="text-xs text-center text-muted-foreground mt-4">
-            By signing up, you agree to our{" "}
-            <Link to="/terms" className="text-primary hover:underline">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link to="/privacy" className="text-primary hover:underline">
-              Privacy Policy
-            </Link>
+            By creating an admin account you agree to follow platform policies.
           </p>
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -222,9 +231,9 @@ export default function SignUpPage() {
           </div>
           <div className="text-center">
             <p className="text-muted-foreground">
-              Already have an account?{" "}
+              Already have an admin account?{" "}
               <Link
-                to="/login"
+                to="/admin/login"
                 className="text-primary font-medium hover:text-accent transition-colors"
               >
                 Sign in
@@ -232,9 +241,15 @@ export default function SignUpPage() {
             </p>
           </div>
         </Card>
-        <AlertModal open={alertState.open} title={alertState.title} message={alertState.message} primaryLabel={alertState.primaryLabel} onPrimary={alertState.onPrimary || (() => setAlertState({open:false}))} />
-        <div className="text-center mt-6">
-        </Card>
+        <AlertModal
+          open={alertState.open}
+          title={alertState.title}
+          message={alertState.message}
+          primaryLabel={alertState.primaryLabel}
+          onPrimary={
+            alertState.onPrimary || (() => setAlertState({ open: false }))
+          }
+        />
         <div className="text-center mt-6">
           <Link
             to="/"
