@@ -1,20 +1,25 @@
 const PRODUCTION_REDIRECT_URI = "https://docverify-two.vercel.app/auth/google/callback";
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
-// Helper to sanitize a configured redirect URI. If it points to localhost/127.0.0.1, ignore it.
+// Helper to sanitize a configured redirect URI. If its hostname does not match the production hostname, ignore it.
 const sanitizeRedirectUri = (uri) => {
   if (!uri) return null;
-  const lower = uri.toLowerCase();
-  if (lower.includes("localhost") || lower.includes("127.0.0.1")) {
-    // Don't allow localhost in production flows — override with production callback
-    console.warn("Ignored VITE_GOOGLE_REDIRECT_URI because it points to localhost/127.0.0.1. Falling back to production redirect URI.");
+  try {
+    const uriHost = new URL(uri).hostname;
+    const productionHost = new URL(PRODUCTION_REDIRECT_URI).hostname;
+    if (uriHost !== productionHost) {
+      // configured redirect doesn't match production host — ignore it and use production
+      return null;
+    }
+    return uri;
+  } catch (e) {
+    // invalid URL — ignore
     return null;
   }
-  return uri;
 };
 
 // Build Google OAuth URL using environment configuration. When VITE_GOOGLE_REDIRECT_URI is
-// not provided or points to localhost, default to the production redirect URI.
+// not provided or its hostname differs from production, default to the production redirect URI.
 export const getGoogleAuthUrl = () => {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const configured = sanitizeRedirectUri(import.meta.env.VITE_GOOGLE_REDIRECT_URI);
