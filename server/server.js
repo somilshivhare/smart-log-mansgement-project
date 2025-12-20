@@ -47,6 +47,16 @@ io.engine.on("connection_error", (err) => {
   console.warn("Socket engine connection_error:", err?.message || err);
 });
 app.set("io", io);
+
+// Health check endpoint (for monitoring services like UptimeRobot)
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 app.use("/api/admin/auth", AdminRouter);
 app.use("/api/citizen/auth", CitizenRouter);
 app.use("/api/admin", adminMiddleware, AdminHomeRouter);

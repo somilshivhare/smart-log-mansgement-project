@@ -24,3 +24,8 @@ build/
 .DS_Store
 Thumbs.db
 
+# Documentation (not needed in repo)
+README.md
+DEPLOYMENT_GUIDE.md
+*.md
+
