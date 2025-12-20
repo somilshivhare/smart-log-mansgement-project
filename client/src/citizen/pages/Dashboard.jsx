@@ -39,7 +39,7 @@ export default function Dashboard() {
     try {
       setIsLoadingActivity(true);
       const response = await fetch(
-        `${API_BASE_URL}/api/user/activity/history`,
+        `${API_BASE_URL}/user/activity/history`,
         { credentials: "include" }
       );
       const data = await response.json().catch(() => null);
@@ -63,7 +63,7 @@ export default function Dashboard() {
     try {
       setIsLoadingDocuments(true);
       const response = await fetch(
-        `${API_BASE_URL}/api/document/fetch-documents`,
+        `${API_BASE_URL}/document/fetch-documents`,
         {
           method: "GET",
           credentials: "include",
@@ -174,7 +174,7 @@ export default function Dashboard() {
       formData.append("documentType", documentType);
 
       const response = await fetch(
-        `${API_BASE_URL}/api/document/upload-document`,
+        `${API_BASE_URL}/document/upload-document`,
         {
           method: "POST",
           body: formData,

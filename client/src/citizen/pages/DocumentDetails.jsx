@@ -17,7 +17,7 @@ export default function DocumentDetailsPage() {
       try {
         setIsLoading(true);
         const response = await fetch(
-          `${API_BASE_URL}/api/document/${documentId}`,
+          `${API_BASE_URL}/document/${documentId}`,
           {
             method: "GET",
             credentials: "include",
