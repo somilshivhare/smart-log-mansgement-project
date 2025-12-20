@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import HeroSection from "../components/HeroSection";
 import HowItWorksSection from "../components/HowItWorks";
 import KeyFeaturesSection from "../components/KeyFeatures";
+import { FeaturesSectionDemo } from "../components/Bentogrid";
 import TrustSecuritySection from "../components/TrustSecurity";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useState, useEffect } from "react";
@@ -39,7 +40,7 @@ export default function Page() {
 
         <HeroSection />
         <HowItWorksSection />
-        <KeyFeaturesSection />
+        <FeaturesSectionDemo />
         <TrustSecuritySection />
         <CtaSection />
       </main>

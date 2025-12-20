@@ -65,8 +65,16 @@ function DocumentReview() {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success)
         throw new Error(data?.message || "Failed to approve");
+      // Update UI immediately so page reflects approved state
+      setDocumentData((prev) => ({
+        ...prev,
+        status: "approved",
+        verificationDate: new Date().toLocaleString(),
+        approvalFeedback: approveFeedback.trim() || "Approved by admin",
+      }));
       toast.success("Document approved");
-      navigate("/admin/verification");
+      // Delay navigation so user sees the approved state briefly
+      setTimeout(() => navigate("/admin/verification"), 800);
     } catch (err) {
       toast.error(err?.message || "Failed to approve document");
     } finally {
@@ -95,9 +103,16 @@ function DocumentReview() {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success)
         throw new Error(data?.message || "Failed to reject");
+      // Update UI immediately so page reflects rejected state
+      setDocumentData((prev) => ({
+        ...prev,
+        status: "rejected",
+        rejectionReason,
+      }));
       toast.success("Document rejected");
       setShowRejectDialog(false);
-      navigate("/admin/verification");
+      // Delay navigation so user sees the rejected state briefly
+      setTimeout(() => navigate("/admin/verification"), 800);
     } catch (err) {
       toast.error(err?.message || "Failed to reject document");
     } finally {
@@ -359,86 +374,119 @@ function DocumentReview() {
             <h3 className="text-sm font-semibold text-gray-900 mb-4">
               Final Decision
             </h3>
-            <div className="space-y-3">
-              <button
-                onClick={() => setShowApproveDialog(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors font-medium bg-green-600 hover:bg-green-700 text-white"
-              >
-                <CheckCircle size={20} />
-                <span>Approve Document</span>
-              </button>
-              {/* Approve Dialog */}
-              {showApproveDialog && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                  <div className="bg-white rounded-lg max-w-md w-full p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Approve Document
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Please provide feedback for approval (optional):
-                    </p>
-                    <textarea
-                      value={approveFeedback}
-                      onChange={(e) => setApproveFeedback(e.target.value)}
-                      placeholder="Enter approval feedback..."
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-700 mb-4"
-                    />
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          setShowApproveDialog(false);
-                          setApproveFeedback("");
-                        }}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleApprove}
-                        disabled={approveLoading}
-                        className={`flex-1 px-4 py-2 rounded-lg ${
-                          approveLoading
-                            ? "bg-green-600 opacity-70 cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
-                      >
-                        {approveLoading ? (
-                          <svg
-                            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                            ></path>
-                          </svg>
-                        ) : null}
-                        {approveLoading ? "Approving..." : "Confirm Approve"}
-                      </button>
+
+            {/* If already decided, show status */}
+            {documentData.status === "approved" ? (
+              <div className="flex flex-col items-start gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md">
+                  <CheckCircle size={18} />
+                  <span className="font-medium">Approved</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {documentData.verificationDate
+                    ? `Approved on ${documentData.verificationDate}`
+                    : "Approved"}
+                </p>
+                {documentData.approvalFeedback ? (
+                  <div className="text-sm text-gray-700">
+                    {documentData.approvalFeedback}
+                  </div>
+                ) : null}
+              </div>
+            ) : documentData.status === "rejected" ? (
+              <div className="flex flex-col items-start gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-md">
+                  <XCircle size={18} />
+                  <span className="font-medium">Rejected</span>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {documentData.rejectionReason
+                    ? `Reason: ${documentData.rejectionReason}`
+                    : "Rejected"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowApproveDialog(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors font-medium bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle size={20} />
+                  <span>Approve Document</span>
+                </button>
+                {/* Approve Dialog */}
+                {showApproveDialog && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Approve Document
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Please provide feedback for approval (optional):
+                      </p>
+                      <textarea
+                        value={approveFeedback}
+                        onChange={(e) => setApproveFeedback(e.target.value)}
+                        placeholder="Enter approval feedback..."
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-700 mb-4"
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowApproveDialog(false);
+                            setApproveFeedback("");
+                          }}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleApprove}
+                          disabled={approveLoading}
+                          className={`flex-1 px-4 py-2 rounded-lg ${
+                            approveLoading
+                              ? "bg-green-600 opacity-70 cursor-not-allowed"
+                              : "bg-green-600 text-white hover:bg-green-700"
+                          }`}
+                        >
+                          {approveLoading ? (
+                            <svg
+                              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                              ></path>
+                            </svg>
+                          ) : null}
+                          {approveLoading ? "Approving..." : "Confirm Approve"}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <button
-                onClick={() => setShowRejectDialog(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-              >
-                <XCircle size={20} />
-                <span>Reject Document</span>
-              </button>
-            </div>
+                )}
+                <button
+                  onClick={() => setShowRejectDialog(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  <XCircle size={20} />
+                  <span>Reject Document</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

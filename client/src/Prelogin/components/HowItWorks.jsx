@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import ScrollStack, { ScrollStackItem } from "@/components/ScrollStack";
 export default function HowItWorksSection() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
@@ -110,30 +111,41 @@ export default function HowItWorksSection() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {steps.map((step, index) => (
-            <motion.div
-              key={index}
-              ref={(el) => (stepsRef.current[index] = el)}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: index * 0.12 }}
-              viewport={{ once: true, amount: 0.2 }}
-              className="relative tilt"
-            >
-              <div className="flex flex-col items-center text-center space-y-4 p-6 rounded-lg border border-border bg-card hover:shadow-lg transition-shadow duration-300">
-                <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-primary/10 to-accent/10 flex items-center justify-center text-primary transition-transform duration-300">
-                  {step.icon}
+        {/* ScrollStack: convert steps into stacked scroll cards */}
+        <div className="">
+          <ScrollStack
+            useWindowScroll={true}
+            itemDistance={140}
+            itemScale={0.04}
+            itemStackDistance={36}
+            stackPosition="30%"
+            scaleEndPosition="16%"
+            baseScale={0.9}
+            blurAmount={1}
+            className="pt-8 pb-24"
+          >
+            {steps.map((step, index) => (
+              <ScrollStackItem
+                key={index}
+                itemClassName="p-6 rounded-lg border border-border bg-card hover:shadow-lg transition-shadow duration-300"
+              >
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-primary/10 to-accent/10 flex items-center justify-center text-primary transition-transform duration-300">
+                    {step.icon}
+                  </div>
+                  <div className="text-xs font-bold text-muted-foreground tracking-wider">
+                    {step.number}
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground text-pretty">
+                    {step.description}
+                  </p>
                 </div>
-                <div className="text-xs font-bold text-muted-foreground tracking-wider">{step.number}</div>
-                <h3 className="text-xl font-semibold text-foreground">{step.title}</h3>
-                <p className="text-sm text-muted-foreground text-pretty">{step.description}</p>
-              </div>
-              {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-8 -right-4 w-8 h-px bg-border" />
-              )}
-            </motion.div>
-          ))}
+              </ScrollStackItem>
+            ))}
+          </ScrollStack>
         </div>
       </div>
     </section>

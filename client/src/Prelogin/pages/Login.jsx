@@ -25,6 +25,7 @@ export default function LoginPage() {
     primaryLabel: "OK",
     onPrimary: null,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleGoogleLogin = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -67,6 +68,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const location = await getLocation();
       const res = await axios.post(
@@ -95,12 +97,14 @@ export default function LoginPage() {
         primaryLabel: "OK",
         onPrimary: () => setAlertState({ open: false }),
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
   return (
     <div className="min-h-screen">
       <PageWrapper>
-        <div className="flex items-center justify-center p-4 min-h-[60vh]">
+        <div className="flex items-center justify-center p-4 min-h-screen">
           <div className="w-full max-w-md animate-[fade-in-up_0.6s_ease-out]">
             <div className="text-center mb-8">
               <Link
@@ -135,6 +139,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="h-11"
                   />
                 </div>
@@ -161,6 +166,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      disabled={isSubmitting}
                       className="h-11 pr-12"
                     />
                     <button
@@ -178,9 +184,37 @@ export default function LoginPage() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-primary hover:bg-accent text-primary-foreground font-medium transition-all duration-300 hover:scale-[1.02]"
+                  size="lg"
+                  disabled={isSubmitting}
+                  className="w-full h-11 bg-accent text-accent-foreground hover:bg-accent/90 text-base hover:scale-105 transition-transform duration-200 font-medium"
                 >
-                  Sign In
+                  {isSubmitting ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
                 </Button>
               </form>
               <div className="relative my-6">
@@ -196,7 +230,9 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 mb-4 flex items-center justify-center gap-3 bg-card hover:bg-muted border-input"
+                size="lg"
+                disabled={isSubmitting}
+                className="w-full h-11 mb-4 flex items-center justify-center gap-3 text-base bg-transparent hover:scale-105 transition-transform duration-200 border-input"
                 onClick={handleGoogleLogin}
               >
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">

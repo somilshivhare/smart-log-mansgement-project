@@ -24,6 +24,7 @@ export default function AdminSignUpPage() {
     primaryLabel: "OK",
     onPrimary: null,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,6 +39,7 @@ export default function AdminSignUpPage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_API_PATH}/admin/auth/signup`,
@@ -94,6 +96,8 @@ export default function AdminSignUpPage() {
         primaryLabel: "OK",
         onPrimary: () => setAlertState({ open: false }),
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -130,6 +134,7 @@ export default function AdminSignUpPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                disabled={isSubmitting}
                 className="h-11"
               />
             </div>
@@ -144,6 +149,7 @@ export default function AdminSignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isSubmitting}
                 className="h-11"
               />
             </div>
@@ -160,6 +166,7 @@ export default function AdminSignUpPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
+                  disabled={isSubmitting}
                   className="h-11 pr-12"
                 />
                 <button
@@ -213,9 +220,36 @@ export default function AdminSignUpPage() {
             </div>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="w-full h-11 bg-primary hover:bg-accent text-primary-foreground font-medium transition-all duration-300 hover:scale-[1.02] mt-6"
             >
-              Create Admin Account
+              {isSubmitting ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                  Creating...
+                </>
+              ) : (
+                "Create Admin Account"
+              )}
             </Button>
           </form>
           <p className="text-xs text-center text-muted-foreground mt-4">

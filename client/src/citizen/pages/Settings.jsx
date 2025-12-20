@@ -679,98 +679,105 @@ export default function SettingsPage() {
 
       {/* Sessions Modal */}
       {showSessionsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-gray-300 max-w-2xl w-full p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  Active Sessions
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Sessions where you have logged in (shows login/logout
-                  timestamps and location if available).
-                </p>
-              </div>
-              <Button
-                onClick={() => setShowSessionsModal(false)}
-                variant="outline"
-              >
-                Close
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {loadingSessions ? (
-                <div className="text-sm text-gray-600">Loading sessions...</div>
-              ) : sessions.length === 0 ? (
-                <div className="text-sm text-gray-600">
-                  No session history available.
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-auto z-50">
+          <div className="flex items-start sm:items-center justify-center p-4 min-h-full w-full">
+            <div className="bg-white border border-gray-300 max-w-2xl w-full p-6 max-h-[90vh] overflow-auto">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    Active Sessions
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Sessions where you have logged in (shows login/logout
+                    timestamps and location if available).
+                  </p>
                 </div>
-              ) : (
-                sessions.map((s) => (
-                  <div
-                    key={s.sessionId}
-                    className="p-3 border rounded-md flex items-start justify-between"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm font-medium">
-                          {s.sessionId === currentSessionId
-                            ? "This device"
-                            : `Session: ${s.sessionId.slice(0, 8)}`}
-                        </div>
-                        <div
-                          className={`px-2 py-0.5 text-xs rounded ${
-                            s.isActive
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {s.isActive ? "Active" : "Signed out"}
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Login:{" "}
-                        {s.loginAt ? new Date(s.loginAt).toLocaleString() : "—"}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Logout:{" "}
-                        {s.logoutAt
-                          ? new Date(s.logoutAt).toLocaleString()
-                          : "—"}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        IP: {s.ip || "—"}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Device: {s.userAgent ? s.userAgent.slice(0, 150) : "—"}
-                      </div>
-                      {s.location && (
-                        <div className="text-sm text-gray-600 mt-1">
-                          Location:{" "}
-                          <a
-                            target="_blank"
-                            rel="noreferrer"
-                            href={`https://www.google.com/maps/search/?api=1&query=${s.location.lat},${s.location.lng}`}
-                          >
-                            View
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                    <div className="ml-4 flex flex-col gap-2">
-                      {!s.isActive ? null : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSignOutSession(s.sessionId)}
-                        >
-                          Sign out
-                        </Button>
-                      )}
-                    </div>
+                <Button
+                  onClick={() => setShowSessionsModal(false)}
+                  variant="outline"
+                >
+                  Close
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {loadingSessions ? (
+                  <div className="text-sm text-gray-600">
+                    Loading sessions...
                   </div>
-                ))
-              )}
+                ) : sessions.length === 0 ? (
+                  <div className="text-sm text-gray-600">
+                    No session history available.
+                  </div>
+                ) : (
+                  sessions.map((s) => (
+                    <div
+                      key={s.sessionId}
+                      className="p-3 border rounded-md flex items-start justify-between"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm font-medium">
+                            {s.sessionId === currentSessionId
+                              ? "This device"
+                              : `Session: ${s.sessionId.slice(0, 8)}`}
+                          </div>
+                          <div
+                            className={`px-2 py-0.5 text-xs rounded ${
+                              s.isActive
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {s.isActive ? "Active" : "Signed out"}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          Login:{" "}
+                          {s.loginAt
+                            ? new Date(s.loginAt).toLocaleString()
+                            : "—"}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Logout:{" "}
+                          {s.logoutAt
+                            ? new Date(s.logoutAt).toLocaleString()
+                            : "—"}
+                        </div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          IP: {s.ip || "—"}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Device:{" "}
+                          {s.userAgent ? s.userAgent.slice(0, 150) : "—"}
+                        </div>
+                        {s.location && (
+                          <div className="text-sm text-gray-600 mt-1">
+                            Location:{" "}
+                            <a
+                              target="_blank"
+                              rel="noreferrer"
+                              href={`https://www.google.com/maps/search/?api=1&query=${s.location.lat},${s.location.lng}`}
+                            >
+                              View
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                      <div className="ml-4 flex flex-col gap-2">
+                        {!s.isActive ? null : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSignOutSession(s.sessionId)}
+                          >
+                            Sign out
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

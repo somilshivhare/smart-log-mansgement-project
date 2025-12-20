@@ -258,17 +258,23 @@ export default function Dashboard() {
       <Header />
       <PageWrapper className="py-8">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-8">
+          <h1 className="text-2xl font-bold text-foreground mb-8">
             Citizen Dashboard
           </h1>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card glass className="p-6">
               <div className="text-sm text-gray-600 mb-1">Total Documents</div>
-              <div className="text-3xl font-semibold text-gray-900">{stats.total}</div>
+              <div className="text-3xl font-semibold text-foreground">
+                {stats.total}
+              </div>
             </Card>
             <Card glass className="p-6">
-              <div className="text-sm text-gray-600 mb-1">Approved Documents</div>
-              <div className="text-3xl font-semibold text-green-700">{stats.approved}</div>
+              <div className="text-sm text-gray-600 mb-1">
+                Approved Documents
+              </div>
+              <div className="text-3xl font-semibold text-green-700">
+                {stats.approved}
+              </div>
             </Card>
             <div className="bg-white border border-gray-200 p-6">
               <div className="text-sm text-gray-600 mb-1">
@@ -282,7 +288,7 @@ export default function Dashboard() {
 
           {/* Document Upload Section */}
           <div className="bg-white border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
               Upload Document
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -338,8 +344,9 @@ export default function Dashboard() {
               )}
               <Button
                 type="submit"
+                size="lg"
                 disabled={isUploading}
-                className="bg-gray-800 text-white hover:bg-gray-900 px-6"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 text-base hover:scale-105 transition-transform duration-200 font-medium px-6"
               >
                 <Upload className="w-4 h-4 mr-2" />
                 {isUploading ? "Submitting..." : "Submit Document"}
@@ -353,7 +360,7 @@ export default function Dashboard() {
           {/* Document Status Table */}
           <div className="bg-white border border-gray-200 mb-8">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-foreground">
                 Document Status
               </h2>
             </div>
@@ -472,7 +479,7 @@ export default function Dashboard() {
                     disabled={documents.length === 0}
                     className={
                       currentPage === i + 1
-                        ? "bg-gray-800 text-white hover:bg-gray-900"
+                        ? "bg-accent text-accent-foreground hover:bg-accent/90"
                         : "border-gray-300 text-gray-700 hover:bg-gray-100"
                     }
                   >
@@ -496,7 +503,7 @@ export default function Dashboard() {
 
           {/* Verification Feedback Section */}
           <div className="bg-white border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
               Recent Verification Result
             </h2>
             {verificationResult ? (
