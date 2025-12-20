@@ -7,7 +7,7 @@ client/.env
 
 # Dependencies
 node_modules/
-package-lock.json
+# package-lock.json - Keep for Railway deployment consistency
 
 # Build outputs
 dist/
