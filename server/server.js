@@ -24,8 +24,25 @@ if (missing.length) {
   process.exit(1);
 }
 
-// Normalize FRONTEND_URL (strip trailing slash) but keep local fallback
-const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+// In production, require OAuth and frontend settings as well
+if (process.env.NODE_ENV === "production") {
+  const prodRequired = ["FRONTEND_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
+  const prodMissing = prodRequired.filter((k) => !process.env[k]);
+  if (prodMissing.length) {
+    console.error(
+      "Missing required production environment variables:",
+      prodMissing.join(", ")
+    );
+    process.exit(1);
+  }
+}
+
+// Normalize FRONTEND_URL (strip trailing slash). In production, FRONTEND_URL must be set.
+const FRONTEND_URL = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/+$/, "") : undefined;
+if (process.env.NODE_ENV === "production" && !FRONTEND_URL) {
+  console.error("Missing required environment variable: FRONTEND_URL (must be set in production to your frontend origin)");
+  process.exit(1);
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -33,7 +50,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: FRONTEND_URL || (process.env.NODE_ENV !== "production" ? true : false),
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -44,7 +61,7 @@ await connectDB();
 // setup socket.io
 const io = new IoServer(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: FRONTEND_URL || (process.env.NODE_ENV !== "production" ? true : false),
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],

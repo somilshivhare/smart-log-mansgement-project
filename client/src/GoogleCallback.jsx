@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getGoogleRedirectUri } from "./utils/googleAuth";
 
 export default function GoogleCallback() {
   const navigate = useNavigate();
@@ -27,9 +28,7 @@ export default function GoogleCallback() {
           `${import.meta.env.VITE_API_PATH}/citizen/auth/google`,
           {
             code,
-            redirectUri:
-              import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
-              `${window.location.origin}/auth/google/callback`,
+            redirectUri: getGoogleRedirectUri(),
           },
           { withCredentials: true }
         );

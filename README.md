@@ -62,9 +62,9 @@ GEMINI_API_KEY=your_gemini_api_key
 Create a `.env` file in the `client` directory:
 
 ```env
-VITE_API_PATH=http://localhost:4000/api
+VITE_API_PATH=https://your-backend.example.com/api
 VITE_GOOGLE_CLIENT_ID=your_google_client_id
-VITE_GOOGLE_REDIRECT_URI=http://localhost:5173/auth/google/callback
+VITE_GOOGLE_REDIRECT_URI=https://your-frontend.example.com/auth/google/callback
 ```
 
 ### 3. Run the Application
@@ -76,7 +76,7 @@ cd server
 npm run dev
 ```
 
-The server will run on `http://localhost:4000`
+The server will run on the PORT you set (default 4000).
 
 #### Start the Client
 
@@ -85,7 +85,7 @@ cd client
 npm run dev
 ```
 
-The client will run on `http://localhost:5173`
+The client will run on the dev server port you choose (default 5173).
 
 ## Deployment
 

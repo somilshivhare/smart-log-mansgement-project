@@ -29,15 +29,13 @@ export default function LoginPage() {
 
   const handleGoogleLogin = () => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const redirectUri =
-      import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
-      `${window.location.origin}/auth/google/callback`;
+    const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 
-    if (!clientId) {
+    if (!clientId || !redirectUri) {
       setAlertState({
         open: true,
         title: "Configuration",
-        message: "Google Client ID is not configured.",
+        message: "Google OAuth is not configured. Please set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_REDIRECT_URI in your environment.",
         primaryLabel: "OK",
         onPrimary: () => setAlertState({ open: false }),
       });
