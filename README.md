@@ -82,96 +82,26 @@ npm run dev
 
 The client will run on `http://localhost:5173`
 
-## Railway Deployment
+## Deployment
 
-### Prerequisites for Railway
+This project is configured for deployment using **Vercel (Frontend) + Render (Backend)**.
 
-1. A Railway account (sign up at [railway.app](https://railway.app))
-2. GitHub repository connected to Railway
-3. MongoDB Atlas database (or Railway MongoDB service)
+### Recommended Deployment Platforms
 
-### Deployment Steps
-
-#### 1. Deploy Backend (Server)
-
-1. Create a new project in Railway
-2. Add a new service and select "Deploy from GitHub repo"
-3. Select your repository
-4. Railway will auto-detect the Node.js project
-5. Set the root directory to `server`
-6. Configure the following environment variables in Railway:
-
-   - `MONGO_URI` - Your MongoDB connection string
-   - `CLOUDINARY_CLOUD_NAME` - Cloudinary cloud name
-   - `CLOUDINARY_API_KEY` - Cloudinary API key
-   - `CLOUDINARY_API_SECRET` - Cloudinary API secret
-   - `JWT_SECRET` - Your JWT secret (use a strong random string)
-   - `PORT` - Railway will set this automatically, but you can use `PORT` variable
-   - `GOOGLE_CLIENT_ID` - Google OAuth client ID
-   - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-   - `GOOGLE_REDIRECT_URI` - Update to your Railway frontend URL (e.g., `https://your-frontend.railway.app/auth/google/callback`)
-   - `GEMINI_API_KEY` - Gemini API key
-   - `NODE_ENV` - Set to `production`
-
-7. Railway will automatically:
-   - Install dependencies (`npm install`)
-   - Run the start command (`npm start`)
-
-#### 2. Deploy Frontend (Client)
-
-1. Add another service in the same Railway project
-2. Select "Deploy from GitHub repo" (same repository)
-3. Set the root directory to `client`
-4. Configure build and start commands:
-   - Build Command: `npm install && npm run build`
-   - Start Command: `npm run preview` (or use a static file server)
-   
-   **Note:** For Vite apps, you might want to use a static file server. Consider adding `serve` package:
-   ```json
-   "scripts": {
-     "preview": "vite preview",
-     "serve": "serve dist -s"
-   }
-   ```
-
-5. Configure environment variables:
-   - `VITE_API_PATH` - Your Railway backend URL (e.g., `https://your-backend.railway.app/api`)
-   - `VITE_GOOGLE_CLIENT_ID` - Google OAuth client ID
-   - `VITE_GOOGLE_REDIRECT_URI` - Your Railway frontend URL (e.g., `https://your-frontend.railway.app/auth/google/callback`)
-
-#### 3. Update CORS Settings
-
-After deployment, update the CORS origin in `server/server.js` to include your Railway frontend URL:
-
-```javascript
-cors({
-  origin: [
-    "http://localhost:5173",
-    "https://your-frontend.railway.app"
-  ],
-  credentials: true,
-  // ... rest of config
-})
-```
-
-### Railway Configuration
-
-The project includes a `railway.json` file for Railway-specific configuration. Railway will automatically:
-- Detect Node.js projects
-- Install dependencies
-- Run the start command
+- **Frontend**: Deploy to [Vercel](https://vercel.com) for best performance and CDN
+- **Backend**: Deploy to [Render](https://render.com) for WebSocket support (Socket.io)
 
 ### Important Notes
 
-1. **Environment Variables**: Never commit `.env` files. All sensitive data should be set in Railway's environment variables section.
+1. **Environment Variables**: Never commit `.env` files. All sensitive data should be set in your deployment platform's environment variables section.
 
 2. **Database**: Use MongoDB Atlas for production. Update the `MONGO_URI` with your Atlas connection string.
 
-3. **CORS**: Make sure to update CORS settings to allow your production frontend URL.
+3. **CORS**: The backend automatically uses the `FRONTEND_URL` environment variable for CORS configuration.
 
 4. **Google OAuth**: Update Google OAuth redirect URIs in Google Cloud Console to include your production URLs.
 
-5. **Static Files**: For the frontend, Railway can serve static files. Make sure the build output (`dist` folder) is properly configured.
+5. **Health Check**: The backend includes a `/health` endpoint for monitoring services.
 
 ## Scripts
 
