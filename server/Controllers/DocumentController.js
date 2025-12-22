@@ -1,5 +1,6 @@
 import cloudinary from "../Config/cloudinary.js";
 import Tesseract from "tesseract.js";
+import sharp from "sharp";
 import { Document } from "../Models/Document.js";
 import { Verification } from "../Models/Verification.js";
 import { ActivityHistory } from "../Models/ActivityHistory.js";
@@ -27,6 +28,122 @@ const extractJsonObject = (value) => {
 
   return text.slice(firstBrace, lastBrace + 1);
 };
+
+// Preprocess image buffer to improve OCR results (grayscale, normalize, resize, sharpen, threshold)
+// Returns a Buffer suitable for Tesseract.recognize
+const preprocessImageForOCR = async (buffer) => {
+  try {
+    const processed = await sharp(buffer)
+      .rotate() // auto-orient using EXIF
+      .grayscale()
+      .normalise()
+      .resize({ width: 2000, withoutEnlargement: false })
+      .sharpen()
+      .threshold(140)
+      .toFormat("png")
+      .toBuffer();
+    return processed;
+  } catch (err) {
+    console.warn(
+      "Image preprocessing failed, falling back to original buffer",
+      err?.message || err
+    );
+    return buffer;
+  }
+};
+
+// Simple cleanup of OCR output: remove soft hyphens, fix hyphenated line breaks, collapse whitespace
+const cleanOcrText = (text) => {
+  if (!text || typeof text !== "string") return "";
+  let t = text.replace(/\u00AD/g, ""); // soft hyphen
+  t = t.replace(/-\s*\n\s*/g, ""); // join hyphenated line breaks
+  t = t.replace(/\r/g, "\n");
+  t = t.replace(/\n{2,}/g, "\n"); // collapse multiple newlines
+  t = t.replace(/[^\x00-\x7F]+/g, " "); // replace non-ascii chars with spaces
+  t = t.replace(/[ \t]{2,}/g, " ");
+  return t.trim();
+};
+
+// Heuristic fallback extractor: attempts to find common fields when LLM fails
+export const fallbackExtractFields = (text) => {
+  if (!text || typeof text !== "string") return {};
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const result = {};
+
+  const pushIfFound = (key, value) => {
+    if (!value) return;
+    if (!result[key]) result[key] = value;
+  };
+
+  // Patterns expanded: name, dob, ids, passport, driver's license, national ids, email, phone, address, dates
+  const namePattern =
+    /(?:Name\s*[:\-]?|Full Name\s*[:\-]?|Surname\s*[:\-]?|Given Names\s*[:\-]?)(.+)/i;
+  const dobPattern =
+    /(?:Date\s*of\s*Birth|DOB|Birth\s*Date)[:\-\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\-]\d{1,2}[\-]\d{1,2})/i;
+  const idPattern =
+    /(?:ID\s*No\.?|ID\s*Number|Identification|NIN|SSN|TIN|PAN|Passport\s*No\.?|Document\s*No\.?|Document\s*Number)[:\-\s]*([A-Z0-9\-\/]{4,40})/i;
+  const driversPattern =
+    /(?:Driver\'?s?\s*License|DL)[:\-\s]*([A-Z0-9\-]{4,30})/i;
+  const passportPattern = /(?:Passport)[:\-\s]*([A-Z0-9\-]{4,20})/i;
+  const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i;
+  const phonePattern = /(\+?\d[\d\s\-()]{6,}\d)/i;
+  const datePattern =
+    /(\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b|\b\d{4}[\-]\d{1,2}[\-]\d{1,2}\b)/;
+  const addressPattern = /(?:Address|Addr|Residence|Street)[:\-]?\s*(.+)/i;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let m;
+
+    if ((m = line.match(namePattern))) pushIfFound("name", m[1].trim());
+    if ((m = line.match(dobPattern))) pushIfFound("date_of_birth", m[1].trim());
+    if ((m = line.match(idPattern))) pushIfFound("id_number", m[1].trim());
+    if ((m = line.match(driversPattern)))
+      pushIfFound("drivers_license", m[1].trim());
+    if ((m = line.match(passportPattern)))
+      pushIfFound("passport_number", m[1].trim());
+    if ((m = line.match(emailPattern))) pushIfFound("email", m[1].trim());
+    if ((m = line.match(phonePattern))) pushIfFound("phone", m[1].trim());
+    if ((m = line.match(addressPattern))) {
+      let address = m[1].trim();
+      const next = lines[i + 1];
+      if (
+        next &&
+        next.length > 10 &&
+        /[A-Za-z0-9]/.test(next) &&
+        !/^(DOB|Date|Passport|ID|Document|Expiry)/i.test(next)
+      ) {
+        address += ", " + next;
+      }
+      pushIfFound("address", address);
+    }
+
+    // generic expiry/date
+    if (
+      !result.expiry_date &&
+      (m = line.match(
+        /(?:Expiry|Expiry Date|Expires)[:\-\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\-]\d{1,2}[\-]\d{1,1})/i
+      ))
+    )
+      pushIfFound("expiry_date", m[1].trim());
+
+    // generic date capture
+    if (!result.any_date && datePattern.test(line))
+      pushIfFound("any_date", (line.match(datePattern) || [])[0]);
+  }
+
+  // Last resort: pick long numeric tokens that could be document numbers
+  if (!result.id_number) {
+    const numericToken = text.match(/\b[A-Z0-9]{6,}\b/gi);
+    if (numericToken) pushIfFound("possible_document_number", numericToken[0]);
+  }
+
+  return result;
+};
+
 export const uploadDocument = async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
@@ -64,9 +181,11 @@ export const uploadDocument = async (req, res) => {
             error,
           });
         }
+        const preprocessedBuffer = await preprocessImageForOCR(req.file.buffer);
         const {
-          data: { text },
-        } = await Tesseract.recognize(req.file.buffer, "eng");
+          data: { text: rawText },
+        } = await Tesseract.recognize(preprocessedBuffer, "eng");
+        const text = cleanOcrText(rawText);
         const doc = await Document.create({
           name: req.file.originalname,
           url: result.secure_url,
@@ -132,23 +251,165 @@ Rules:
           contents: `${prompt}\n\nExtracted Text:\n${text}`,
         });
         const jsonText = extractJsonObject(geminiRes.text) ?? geminiRes.text;
-        let geminiData;
+        let geminiData = null;
+        let geminiParseFailed = false;
+        const rawGeminiText = String(geminiRes.text || "");
         try {
           geminiData = JSON.parse(jsonText);
-        } catch {
-          return res.status(502).json({
-            success: false,
-            message: "Server error",
-            error: "Gemini returned invalid JSON",
-          });
+        } catch (err) {
+          geminiParseFailed = true;
+          console.warn(
+            "Gemini returned invalid JSON - saving raw response for audit",
+            err?.message || err
+          );
+          try {
+            const { LogsAndAudit } = await import("../Models/LogsAndAudit.js");
+            await LogsAndAudit.log({
+              level: "ERROR",
+              module: "AI Service",
+              message: "Gemini returned invalid JSON",
+              userId,
+              metadata: { response: rawGeminiText.slice(0, 2000) },
+            });
+          } catch (logErr) {
+            console.warn(
+              "Failed to write AI parse error log",
+              logErr?.message || logErr
+            );
+          }
+          // create a fallback geminiData object so downstream code can still run
+          geminiData = {
+            confidence_score: null,
+            feedback: { issues: ["LLM returned invalid JSON"] },
+          };
         }
+
+        // Second LLM pass: extract structured key/value pairs from the cleaned OCR text
+        let extractedData = null;
+        let extractionRetryUsed = false;
+        try {
+          const extractionPromptBase = `You are a JSON extractor. Given OCR text, extract any identifiable key/value pairs (for example: name, document_number, id_number, date_of_birth, address, expiry_date, phone, email, gender, place_of_birth, expiry_date, etc.).\nReturn STRICT JSON ONLY in the following format:\n{\n  "extracted": {"field_name": "value", "another_field": "value"}\n}\nIf nothing obvious can be extracted, return {"extracted": {}}.\nRules:\n- Do NOT include the original raw text in the output.\n- Do NOT include any explanation or markdown - ONLY return JSON.`;
+
+          const runExtraction = async (promptSeed) => {
+            const extractRes = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: `${promptSeed}\n\nText:\n${text}`,
+            });
+            return extractRes;
+          };
+
+          // First attempt
+          const extractRes1 = await runExtraction(extractionPromptBase);
+          let extractedJson =
+            extractJsonObject(extractRes1.text) ?? extractRes1.text;
+          try {
+            const parsed = JSON.parse(extractedJson);
+            extractedData =
+              parsed && parsed.extracted ? parsed.extracted : parsed;
+          } catch (err) {
+            // Retry once with a clarifying prompt if parsing failed or produced empty extraction
+            console.warn(
+              "Initial extraction parse failed or returned empty, retrying extraction once",
+              err?.message || err
+            );
+            extractionRetryUsed = true;
+            const retryPrompt = `Previous response was not valid JSON or contained no fields. Return STRICT JSON ONLY in the exact format {"extracted": {...}} and do NOT include any other text. Repeat only the JSON.`;
+            try {
+              const extractRes2 = await runExtraction(
+                `${retryPrompt}\n\n${extractionPromptBase}`
+              );
+              const extractedJson2 =
+                extractJsonObject(extractRes2.text) ?? extractRes2.text;
+              const parsed2 = JSON.parse(extractedJson2);
+              extractedData =
+                parsed2 && parsed2.extracted ? parsed2.extracted : parsed2;
+            } catch (err2) {
+              console.warn("Retry extraction failed", err2?.message || err2);
+              extractedData = null;
+            }
+          }
+        } catch (err) {
+          console.warn("Failed to run extraction LLM", err?.message || err);
+          extractedData = null;
+        }
+
+        // If extraction returned empty, run heuristic fallback
+        let usedFallback = false;
+        if (
+          !extractedData ||
+          (typeof extractedData === "object" &&
+            Object.keys(extractedData).length === 0)
+        ) {
+          try {
+            const fallback = fallbackExtractFields(text);
+            if (fallback && Object.keys(fallback).length > 0) {
+              extractedData = { ...fallback, _meta: { source: "heuristic" } };
+              usedFallback = true;
+              console.info(
+                "Fallback extraction produced fields",
+                Object.keys(fallback)
+              );
+            }
+          } catch (err) {
+            console.warn("Fallback extraction failed", err?.message || err);
+          }
+        }
+
+        // If the initial LLM parse failed, include a short raw excerpt in feedback for audits
+        let feedbackToSave =
+          geminiData && geminiData.feedback
+            ? geminiData.feedback
+            : { issues: ["LLM returned invalid JSON"] };
+        if (geminiParseFailed) {
+          feedbackToSave = {
+            ...feedbackToSave,
+            raw: rawGeminiText.slice(0, 2000),
+          };
+        }
+        if (usedFallback) {
+          feedbackToSave = {
+            ...feedbackToSave,
+            _note: "Structured data produced by heuristic fallback",
+          };
+        }
+        if (extractionRetryUsed && !usedFallback) {
+          feedbackToSave = {
+            ...feedbackToSave,
+            _note: feedbackToSave._note
+              ? `${feedbackToSave._note}; LLM retry used`
+              : "LLM retry used",
+          };
+        }
+
+        // Determine extraction source to help admin UI & debugging
+        const extractionSource = usedFallback
+          ? "heuristic"
+          : extractedData &&
+            typeof extractedData === "object" &&
+            Object.keys(extractedData).length > 0
+          ? "llm"
+          : null;
+
+        // Ensure extraction metadata is attached to extractedData object when possible
+        try {
+          if (extractedData && typeof extractedData === "object") {
+            extractedData._meta = extractedData._meta || {};
+            if (extractionRetryUsed) extractedData._meta.retry = true;
+            if (extractionSource) extractedData._meta.source = extractionSource;
+          }
+        } catch (e) {
+          // ignore
+        }
+
         const verification = await Verification.create({
           citizenId: userId,
           documentId: doc._id,
           status: "pending",
-          confiedenceScore: geminiData.confidence_score,
+          confiedenceScore: geminiData?.confidence_score ?? null,
           AnalysisData: text,
-          Feedback: JSON.stringify(geminiData.feedback),
+          ExtractedData: extractedData,
+          extractionSource,
+          Feedback: JSON.stringify(feedbackToSave),
         });
         // Log AI confidence warnings if below threshold
         try {
