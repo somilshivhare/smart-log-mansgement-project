@@ -210,35 +210,83 @@ function DocumentReview() {
           {/* Extracted Text */}
           <div className="bg-white border border-gray-200 rounded-lg">
             <div className="p-5 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Extracted Information
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Extracted Information
+                </h2>
+                {documentData.extractionSource ? (
+                  <div className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
+                    Source:{" "}
+                    {String(documentData.extractionSource).toUpperCase()}
+                  </div>
+                ) : null}
+              </div>
             </div>
             <div className="p-5">
-              {documentData.rawVerification?.AnalysisData ? (
-                <pre className="whitespace-pre-wrap text-sm text-gray-900">
-                  {documentData.rawVerification.AnalysisData}
-                </pre>
-              ) : documentData.extractedText ? (
-                <dl className="grid grid-cols-2 gap-4">
-                  {Object.entries(documentData.extractedText).map(
-                    ([key, value]) => (
-                      <div key={key}>
-                        <dt className="text-xs font-medium text-gray-500 uppercase mb-1">
-                          {key.replace(/([A-Z])/g, " $1").trim()}
-                        </dt>
-                        <dd className="text-sm text-gray-900 font-medium">
-                          {value}
-                        </dd>
-                      </div>
-                    )
-                  )}
-                </dl>
+              {documentData.extractedText &&
+              typeof documentData.extractedText === "object" ? (
+                (() => {
+                  const fields = Object.entries(
+                    documentData.extractedText
+                  ).filter(
+                    ([k, v]) =>
+                      !k.startsWith("_") && String(v || "").trim() !== ""
+                  );
+                  if (fields.length > 0) {
+                    return (
+                      <dl className="grid grid-cols-2 gap-4">
+                        {fields.map(([key, value]) => (
+                          <div key={key}>
+                            <dt className="text-xs font-medium text-gray-500 uppercase mb-1">
+                              {key.replace(/([A-Z])/g, " $1").trim()}
+                            </dt>
+                            <dd className="text-sm text-gray-900 font-medium">
+                              {String(value)}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    );
+                  }
+                  return (
+                    <div className="text-sm text-gray-600">
+                      <div>No extracted information available.</div>
+                      {Array.isArray(documentData.warnings) &&
+                      documentData.warnings.length > 0 ? (
+                        <div className="mt-2 text-xs text-orange-600">
+                          {documentData.warnings.map((w, i) => (
+                            <div key={i}>{w}</div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="text-sm text-gray-600">
-                  No extracted information available.
+                  <div>No extracted information available.</div>
+                  {Array.isArray(documentData.warnings) &&
+                  documentData.warnings.length > 0 ? (
+                    <div className="mt-2 text-xs text-orange-600">
+                      {documentData.warnings.map((w, i) => (
+                        <div key={i}>{w}</div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               )}
+
+              {/* Show AI raw excerpt if available (admin-only audit) */}
+              {documentData.aiRawExcerpt ? (
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded">
+                  <p className="text-xs text-gray-500 mb-2">
+                    AI Raw Excerpt (audit)
+                  </p>
+                  <pre className="whitespace-pre-wrap text-xs text-gray-800">
+                    {documentData.aiRawExcerpt}
+                  </pre>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

@@ -42,17 +42,165 @@ export const fetchDocumentById = async (req, res) => {
       .lean();
 
     let feedbackText = null;
+    let parsedFeedback = null;
+    // warnings array (moved higher so transient extraction can push into it)
+    const warnings = [];
+
+    // Prefer a verification that contains ExtractedData; if latest lacks it, try to find a previous verification that has it
+    let displayVerification = latest;
     try {
-      if (latest?.Feedback) {
-        const parsed = JSON.parse(latest.Feedback);
-        if (Array.isArray(parsed?.issues))
-          feedbackText = parsed.issues.join("; ");
+      if (
+        latest &&
+        (!latest.ExtractedData ||
+          (typeof latest.ExtractedData === "object" &&
+            Object.keys(latest.ExtractedData).length === 0))
+      ) {
+        const alt = await Verification.findOne({
+          documentId: doc._id,
+          ExtractedData: { $ne: null },
+        })
+          .sort({ verifiedAt: -1 })
+          .lean();
+        if (alt) {
+          displayVerification = alt;
+          warnings.push(
+            "Using extracted data from previous verification (verify carefully)"
+          );
+        }
+      }
+    } catch (e) {
+      // ignore lookup errors
+    }
+
+    // Parse feedback and extracted data using the selected verification
+    try {
+      if (displayVerification?.Feedback) {
+        parsedFeedback = JSON.parse(displayVerification.Feedback);
+        if (Array.isArray(parsedFeedback?.issues))
+          feedbackText = parsedFeedback.issues.join("; ");
         else
           feedbackText =
-            typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+            typeof parsedFeedback === "string"
+              ? parsedFeedback
+              : JSON.stringify(parsedFeedback);
       }
     } catch (_) {
-      feedbackText = String(latest?.Feedback || "");
+      feedbackText = String(displayVerification?.Feedback || "");
+    }
+
+    // Parse extracted data (LLM-processed) if available from the selected verification
+    let extractedText = null;
+    try {
+      if (displayVerification?.ExtractedData) {
+        extractedText =
+          typeof displayVerification.ExtractedData === "string"
+            ? JSON.parse(displayVerification.ExtractedData)
+            : displayVerification.ExtractedData;
+      }
+    } catch (_) {
+      extractedText = null;
+    }
+
+    // If there's no extractedText stored, attempt a transient heuristic extraction from the selected verification's AnalysisData so admins can see something
+    if (
+      !extractedText &&
+      displayVerification?.AnalysisData &&
+      typeof displayVerification.AnalysisData === "string"
+    ) {
+      try {
+        const t = String(displayVerification.AnalysisData);
+        const lines = t
+          .split(/\n+/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        const fallback = {};
+        const pushIfFound = (key, value) => {
+          if (!value) return;
+          if (!fallback[key]) fallback[key] = value;
+        };
+        for (const line of lines) {
+          let m;
+          if ((m = line.match(/(?:Name\s*[:\-]?|Full Name\s*[:\-]?)(.+)/i)))
+            pushIfFound("name", m[1].trim());
+          if (
+            (m = line.match(
+              /(?:Date\s*of\s*Birth|DOB|Birth\s*Date)[:\-\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\-]\d{1,2}[\-]\d{1,2})/i
+            ))
+          )
+            pushIfFound("date_of_birth", m[1].trim());
+          if (
+            (m = line.match(
+              /(?:ID\s*No\.?|ID\s*Number|Identification|Passport\s*No\.?|Document\s*No\.?|Passport)[:\-\s]*([A-Z0-9\-]{5,30})/i
+            ))
+          )
+            pushIfFound("id_number", m[1].trim());
+          if ((m = line.match(/(?:Address|Addr)[:\-]?\s*(.+)/i)))
+            pushIfFound("address", m[1].trim());
+          if (
+            !fallback.expiry_date &&
+            (m = line.match(
+              /(?:Expiry|Expiry Date|Expires)[:\-\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{4}[\-]\d{1,2}[\-]\d{1,2})/i
+            ))
+          )
+            pushIfFound("expiry_date", m[1].trim());
+        }
+        if (Object.keys(fallback).length > 0) {
+          extractedText = {
+            ...fallback,
+            _meta: { source: "heuristic-transient" },
+          };
+          warnings.push(
+            "Transient heuristic extraction applied (verify carefully)"
+          );
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Build a sanitized verification object to avoid returning raw OCR text (use displayVerification as source for extracted data)
+    const sanitizedVerification = displayVerification
+      ? {
+          _id: displayVerification._id,
+          confiedenceScore: displayVerification.confiedenceScore,
+          verifiedAt: displayVerification.verifiedAt,
+          Feedback: displayVerification.Feedback,
+        }
+      : null;
+
+    // Compute warnings for admin UI when AI parsing failed or returned no structured data
+    if (
+      displayVerification &&
+      (extractedText == null ||
+        (typeof extractedText === "object" &&
+          Object.keys(extractedText).length === 0))
+    ) {
+      warnings.push(
+        "AI parsing returned no structured data or encountered an error; raw AI response saved for audit."
+      );
+    }
+
+    // If heuristic fallback was used, add an informational warning
+    try {
+      if (
+        extractedText &&
+        extractedText._meta &&
+        extractedText._meta.source === "heuristic"
+      ) {
+        warnings.push(
+          "Structured data produced by heuristic fallback (verify carefully)"
+        );
+      }
+    } catch (_) {}
+
+    // Extract any raw LLM excerpt saved in feedback for audit/debug
+    let aiRawExcerpt = null;
+    try {
+      if (parsedFeedback && parsedFeedback.raw) {
+        aiRawExcerpt = String(parsedFeedback.raw);
+      }
+    } catch (_) {
+      aiRawExcerpt = null;
     }
 
     return res.status(200).json({
@@ -78,8 +226,19 @@ export const fetchDocumentById = async (req, res) => {
             ? latest.confiedenceScore
             : null,
         feedback: feedbackText || null,
-        // keep raw AI verification data
-        rawVerification: latest || null,
+        // expose extracted/processed fields (no raw OCR)
+        extractedText: extractedText || null,
+        extractionSource:
+          (extractedText &&
+            extractedText._meta &&
+            extractedText._meta.source) ||
+          displayVerification?.extractionSource ||
+          latest?.extractionSource ||
+          null,
+        warnings,
+        aiRawExcerpt,
+        // sanitized verification metadata (no AnalysisData/raw OCR)
+        rawVerification: sanitizedVerification,
         // admin remarks are stored on the document separately and should not overwrite AI analysis
         remarks: doc.adminRemarks || null,
       },
